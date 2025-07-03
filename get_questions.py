@@ -73,7 +73,7 @@ def save_solved_questions(questions):
 
 if __name__ == "__main__":
     questions = get_questions()
-    save_questions(questions)
+    save_not_solved_questions(questions)
     save_solved_questions(questions)
     print("Script executed successfully.")
 

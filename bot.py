@@ -115,6 +115,7 @@ async def cmd_solved(message: Message):
         )
     except FileNotFoundError:
         await message.answer("Файл с решенными задачами не найден. Выполните /refresh.")
+
 @router.message(Command("help"))
 async def cmd_help(message: Message):
     help_text = (
