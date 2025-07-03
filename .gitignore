@@ -7,3 +7,6 @@ __pycache__/get_questions.cpython-313.pyc
 Query_params/LEETCODE_SESSION.txt
 Query_params/leetcode_variables.json
 bot_token.txt
+Data/user_sessions.json
+Data/users_settings.json
+Data/LEETCODE_SESSION.txt

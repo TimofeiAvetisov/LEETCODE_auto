@@ -34,18 +34,27 @@ class SetDifficulty(StatesGroup):
 
 @router.message(Command("start"))
 async def cmd_start(message: Message):
-    await message.answer("Добро пожаловать! Используйте /today, /refresh, /set или /solved.")
+    await message.answer("Добро пожаловать! Используйте /today, /refresh, /set, /solved или /set_session.")
 
 @router.message(Command("today"))
 async def cmd_today(message: Message):
     await message.answer("Выводим задачи на сегодня...")
-    questions = run(refresh=False)
+    with open("Data/user_sessions.json", "r", encoding="utf-8") as f:
+        sessions = json.load(f)
+    session = sessions.get(str(message.from_user.id), None)
+    questions = run(session, str(message.from_user.id))
     await message.answer(format_questions(questions))
 
 @router.message(Command("refresh"))
 async def cmd_refresh(message: Message):
     await message.answer("Обновляем файл с актуальными нерешёнными задачами...")
-    count_not_solved, count_solved = refresh_questions()
+    with open("Data/user_sessions.json", "r", encoding="utf-8") as f:
+        sessions = json.load(f)
+    session = sessions.get(str(message.from_user.id), None)
+    if not session:
+        await message.answer("Сессия не найдена. Пожалуйста, установите сессию с помощью /set_session.")
+        return
+    count_not_solved, count_solved = refresh_questions(session, str(message.from_user.id))
     if count_not_solved > 0 or count_solved > 0:
         await message.answer(f"Обновлено. Получено {count_not_solved} нерешенных и {count_solved} решенных задач.")
     else:
@@ -90,7 +99,8 @@ async def set_hard(message: Message, state: FSMContext):
                 "Hard": data["hard"]
             }
         }
-        save_settings(settings)
+        user_id = str(message.from_user.id)
+        save_settings(user_id, settings)
         await message.answer("Настройки сохранены. Проверь консоль!")
         await state.clear()
     except ValueError:
@@ -103,11 +113,12 @@ async def cmd_solved(message: Message):
     Выводит количество решенных задач по сложностям
     """
     try:
-        with open("solved_questions.json", "r", encoding="utf-8") as f:
+        with open("Data/solved_questions.json", "r", encoding="utf-8") as f:
             solved_questions = json.load(f)
-        easy_count = sum(1 for q in solved_questions if q["difficulty"] == "Easy")
-        medium_count = sum(1 for q in solved_questions if q["difficulty"] == "Medium")
-        hard_count = sum(1 for q in solved_questions if q["difficulty"] == "Hard")
+        user_solved = solved_questions.get(str(message.from_user.id), [])
+        easy_count = sum(1 for q in user_solved if q["difficulty"] == "Easy")
+        medium_count = sum(1 for q in user_solved if q["difficulty"] == "Medium")
+        hard_count = sum(1 for q in user_solved if q["difficulty"] == "Hard")
         await message.answer(
             f"Решено задач:\n"
             f"Easy: {easy_count}\n"
@@ -116,6 +127,36 @@ async def cmd_solved(message: Message):
         )
     except FileNotFoundError:
         await message.answer("Файл с решенными задачами не найден. Выполните /refresh.")
+
+class SetSession(StatesGroup):
+    waiting_for_cookie = State()
+
+@router.message(Command("set_session"))
+async def cmd_set_session(message: Message, state: FSMContext):
+    await message.answer("Пожалуйста, отправьте ваш LEETCODE_SESSION:")
+    await state.set_state(SetSession.waiting_for_cookie)
+
+@router.message(SetSession.waiting_for_cookie)
+async def process_session_cookie(message: Message, state: FSMContext):
+    session = message.text.strip()
+    user_id = str(message.from_user.id)
+
+    try:
+        with open("Data/user_sessions.json", "r", encoding="utf-8") as f:
+            sessions = json.load(f)
+    except FileNotFoundError:
+        sessions = {}
+
+    sessions[user_id] = session
+
+    print(f"Сессия для пользователя {user_id} сохранена: {session}")
+    print(sessions)
+    with open("Data/user_sessions.json", "w", encoding="utf-8") as f:
+        json.dump(sessions, f, ensure_ascii=False, indent=4)
+
+    await message.answer("Сессия сохранена.")
+    await state.clear()
+
 
 @router.message(Command("help"))
 async def cmd_help(message: Message):
@@ -126,6 +167,8 @@ async def cmd_help(message: Message):
         "/refresh - Обновить список нерешенных задач\n"
         "/set - Настроить количество задач по сложности\n"
         "/solved - Показать количество решенных задач по сложностям\n"
+        "/set_session - Установить LEETCODE_SESSION для работы с ботом\n" 
+        "Примечание: Перед использованием бота, пожалуйста, установите LEETCODE_SESSION с помощью команды /set_session.\n"
         "/help - Показать это сообщение"
     )
     await message.answer(help_text)
