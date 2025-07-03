@@ -95,6 +95,7 @@ async def set_hard(message: Message, state: FSMContext):
         await state.clear()
     except ValueError:
         await message.answer("Введите число.")
+    print(f"Настройки сохранены: {settings}\n\n\n")
 
 @router.message(Command("solved"))
 async def cmd_solved(message: Message):
